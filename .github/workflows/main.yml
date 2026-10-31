@@ -18,6 +18,8 @@ jobs:
     env:
       NODE_VERSION: v20.18.1
       NDK_VERSION: r26d
+      CC_host: gcc
+      CXX_host: g++
     steps:
       - name: Pasang Python 3.11
         uses: actions/setup-python@v5
