@@ -49,7 +49,10 @@ jobs:
         if: matrix.arch == 'arm'
         working-directory: node-${{ env.NODE_VERSION }}
         run: |
-          sed -i 's|--cross-compiling|--cross-compiling --without-intl --without-inspector|' android-configure
+          echo "===== ISI AKHIR android-configure (sebelum patch) ====="
+          tail -n 25 android-configure
+          sed -i 's|\./configure|./configure --without-intl --without-inspector|' android-configure
+          echo "===== SESUDAH PATCH ====="
           grep -n "without-intl" android-configure
 
       - name: Configure (${{ matrix.arch }})
