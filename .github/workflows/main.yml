@@ -1,4 +1,4 @@
-name: Build Node.js untuk Android (arm64 + armv7)
+name: Build Node.js untuk Android (arm64)
 
 on:
   workflow_dispatch:
@@ -7,15 +7,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 240
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # arm64 dimatikan sementara, aktifkan lagi nanti:
-          # - arch: arm64
-          #   abi: arm64-v8a
-          - arch: arm
-            abi: armeabi-v7a
     env:
       NODE_VERSION: v20.18.1
       NDK_VERSION: r26d
@@ -30,7 +21,7 @@ jobs:
       - name: Install dependensi build
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3 make g++ gcc-multilib g++-multilib ccache unzip curl
+          sudo apt-get install -y python3 make g++ ccache unzip curl
 
       - name: Unduh source Node.js dan verifikasi hash
         run: |
@@ -45,21 +36,11 @@ jobs:
           unzip -q android-ndk-${NDK_VERSION}-linux.zip
           echo "NDK_PATH=$PWD/android-ndk-${NDK_VERSION}" >> "$GITHUB_ENV"
 
-      - name: Matikan ICU dan inspector (khusus armv7)
-        if: matrix.arch == 'arm'
+      - name: Configure (arm64)
         working-directory: node-${{ env.NODE_VERSION }}
-        run: |
-          echo "===== ISI AKHIR android-configure (sebelum patch) ====="
-          tail -n 25 android-configure
-          sed -i 's|\./configure|./configure --without-intl --without-inspector|' android-configure
-          echo "===== SESUDAH PATCH ====="
-          grep -n "without-intl" android-configure
+        run: ./android-configure "$NDK_PATH" 24 arm64
 
-      - name: Configure (${{ matrix.arch }})
-        working-directory: node-${{ env.NODE_VERSION }}
-        run: ./android-configure "$NDK_PATH" 24 ${{ matrix.arch }}
-
-      - name: Build (${{ matrix.arch }})
+      - name: Build (arm64)
         working-directory: node-${{ env.NODE_VERSION }}
         run: |
           set -o pipefail
@@ -75,14 +56,14 @@ jobs:
 
       - name: Strip dan ganti nama
         run: |
-          mkdir -p out/${{ matrix.abi }}
-          cp node-${NODE_VERSION}/out/Release/node out/${{ matrix.abi }}/libnode.so
-          "$NDK_PATH"/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip out/${{ matrix.abi }}/libnode.so
-          ls -lh out/${{ matrix.abi }}/libnode.so
-          sha256sum out/${{ matrix.abi }}/libnode.so
+          mkdir -p out/arm64-v8a
+          cp node-${NODE_VERSION}/out/Release/node out/arm64-v8a/libnode.so
+          "$NDK_PATH"/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip out/arm64-v8a/libnode.so
+          ls -lh out/arm64-v8a/libnode.so
+          sha256sum out/arm64-v8a/libnode.so
 
       - name: Unggah hasil
         uses: actions/upload-artifact@v4
         with:
-          name: libnode-${{ matrix.abi }}
-          path: out/${{ matrix.abi }}/libnode.so
+          name: libnode-arm64-v8a
+          path: out/arm64-v8a/libnode.so
