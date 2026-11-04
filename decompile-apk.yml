@@ -1,0 +1,66 @@
+name: Decompile APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL langsung ke file .apk (mis. link asset GitHub Release)"
+        required: true
+        type: string
+      use_apktool:
+        description: "Jalankan apktool (resource, manifest, smali)"
+        type: boolean
+        default: true
+      use_jadx:
+        description: "Jalankan jadx (kode Java/Kotlin)"
+        type: boolean
+        default: true
+
+env:
+  APKTOOL_VERSION: "2.10.0"
+  JADX_VERSION: "1.5.0"
+
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Siapkan Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Unduh APK
+        run: |
+          curl -fL --retry 3 -o app.apk "${{ inputs.apk_url }}"
+          ls -lh app.apk
+
+      - name: Ekstrak isi APK (unzip)
+        run: unzip -q app.apk -d out_unzip
+
+      - name: Bongkar dengan apktool
+        if: ${{ inputs.use_apktool }}
+        run: |
+          curl -fL -o apktool.jar \
+            "https://github.com/iBotPeaches/Apktool/releases/download/v${APKTOOL_VERSION}/apktool_${APKTOOL_VERSION}.jar"
+          java -jar apktool.jar d app.apk -o out_apktool -f
+
+      - name: Dekompilasi dengan jadx
+        if: ${{ inputs.use_jadx }}
+        run: |
+          curl -fL -o jadx.zip \
+            "https://github.com/skylot/jadx/releases/download/v${JADX_VERSION}/jadx-${JADX_VERSION}.zip"
+          unzip -q jadx.zip -d jadx
+          # jadx sering keluar dengan kode error karena sebagian kelas gagal didekompilasi
+          ./jadx/bin/jadx -d out_jadx app.apk || true
+
+      - name: Upload hasil
+        uses: actions/upload-artifact@v4
+        with:
+          name: hasil-bongkar-apk
+          path: |
+            out_unzip
+            out_apktool
+            out_jadx
+          retention-days: 7
+          if-no-files-found: ignore
