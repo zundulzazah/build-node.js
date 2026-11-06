@@ -3,9 +3,13 @@ name: Decompile APK
 on:
   workflow_dispatch:
     inputs:
+      apk_path:
+        description: "Path APK yang sudah di-upload ke repo (mis. uploads/app.apk). Kosongkan jika pakai URL"
+        required: false
+        type: string
       apk_url:
-        description: "URL langsung ke file .apk (mis. link asset GitHub Release)"
-        required: true
+        description: "URL langsung ke file .apk (mis. link asset GitHub Release). Kosongkan jika pakai path"
+        required: false
         type: string
       use_apktool:
         description: "Jalankan apktool (resource, manifest, smali)"
@@ -24,16 +28,34 @@ jobs:
   decompile:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repo (untuk APK yang di-upload)
+        uses: actions/checkout@v4
+
       - name: Siapkan Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Unduh APK
+      - name: Ambil APK (dari path repo atau URL)
+        env:
+          APK_PATH: ${{ inputs.apk_path }}
+          APK_URL: ${{ inputs.apk_url }}
         run: |
-          curl -fL --retry 3 -o app.apk "${{ inputs.apk_url }}"
+          if [ -n "$APK_PATH" ] && [ -n "$APK_URL" ]; then
+            echo "Isi salah satu saja: apk_path ATAU apk_url." >&2; exit 1
+          elif [ -n "$APK_PATH" ]; then
+            if [ ! -f "$APK_PATH" ]; then
+              echo "File tidak ditemukan di repo: $APK_PATH" >&2; exit 1
+            fi
+            cp "$APK_PATH" app.apk
+          elif [ -n "$APK_URL" ]; then
+            curl -fL --retry 3 -o app.apk "$APK_URL"
+          else
+            echo "Isi apk_path atau apk_url." >&2; exit 1
+          fi
           ls -lh app.apk
+          unzip -tq app.apk >/dev/null || { echo "File bukan APK/ZIP yang valid." >&2; exit 1; }
 
       - name: Ekstrak isi APK (unzip)
         run: unzip -q app.apk -d out_unzip
